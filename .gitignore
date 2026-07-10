@@ -1,0 +1,51 @@
+# --- Python Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+.ipynb_checkpoints
+
+# Environment variables & secrets
+.env
+backend/.env
+
+# Local vector database stores
+backend/vectorstore/*
+!backend/vectorstore/.gitkeep
+
+# --- Node/Next.js Frontend ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# --- IDEs and Editors ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+desktop.ini
