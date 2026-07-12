@@ -1,7 +1,7 @@
-import google.generativeai as genai
+from google import genai
 from app.config import settings
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 def run_technical_agent(query: str, history: list[dict], context: list[dict]) -> str:
     """Specialized Technical agent that handles device setups, Wi-Fi, resets, and errors."""
@@ -30,6 +30,8 @@ Instructions:
 
 Answer:"""
     
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model='gemini-1.5-flash',
+        contents=prompt
+    )
     return response.text.strip()
