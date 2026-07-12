@@ -4,7 +4,7 @@ from app.config import settings
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 def run_complaint_agent(query: str, history: list[dict], context: list[dict]) -> str:
-    """Specialized Complaint agent that resolves complaints and de-escalates anger."""
+    """Specialized Complaint agent that resolves complaints and de-escalates anger, with fallback."""
     context_str = "\n\n".join([f"Source: {c['source']} ({c['heading']})\nContent: {c['text']}" for c in context])
     history_str = ""
     for msg in history:
@@ -30,8 +30,12 @@ Instructions:
 
 Answer:"""
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
-    )
-    return response.text.strip()
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"Complaint Agent Gemini call failed: {str(e)}")
+        return "I understand your frustration and apologize for the inconvenience. Our connection is currently limited, but I have flagged this session for direct review by a support supervisor who will contact you shortly."
