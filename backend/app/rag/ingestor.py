@@ -4,6 +4,12 @@ import json
 import numpy as np
 import faiss
 import sys
+import logging
+import warnings
+
+# Suppress HuggingFace hub warnings and logs
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
 from sentence_transformers import SentenceTransformer
 
 # Add the backend root directory to the python path to resolve app imports
