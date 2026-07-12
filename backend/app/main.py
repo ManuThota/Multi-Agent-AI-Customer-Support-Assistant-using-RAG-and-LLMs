@@ -285,3 +285,11 @@ async def get_analytics(current_user: dict = Depends(get_current_user)):
         "agent_usage": agent_usage,
         "customer_name": current_user["full_name"]
     }
+@app.get("/")
+async def root_status():
+    """Welcome endpoint to quickly verify the API server is online."""
+    return {
+        "status": "online",
+        "service": "Multi-Agent Customer Support Assistant API",
+        "documentation": "/docs"
+    }
