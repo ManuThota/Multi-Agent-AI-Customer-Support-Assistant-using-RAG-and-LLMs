@@ -6,8 +6,10 @@ client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 def run_billing_agent(query: str, history: list[dict], context: list[dict]) -> str:
     """Specialized Billing agent that answers queries using RAG context and memory."""
+    # Format the retrieved RAG context
     context_str = "\n\n".join([f"Source: {c['source']} ({c['heading']})\nContent: {c['text']}" for c in context])
     
+    # Format conversation history
     history_str = ""
     for msg in history:
         role = "Customer" if msg["role"] == "user" else "Assistant"
@@ -32,9 +34,9 @@ Instructions:
 
 Answer:"""
     
-    # Use client.models.generate_content
+    # Generate content using gemini-2.5-flash
     response = client.models.generate_content(
-        model='gemini-1.5-flash',
+        model='gemini-2.5-flash',
         contents=prompt
     )
     return response.text.strip()
