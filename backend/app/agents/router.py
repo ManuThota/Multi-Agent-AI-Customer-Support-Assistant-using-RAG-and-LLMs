@@ -1,7 +1,8 @@
 import os
 import sys
 import json
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # Add backend directory to sys path to resolve app imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +18,8 @@ from app.agents.product import run_product_agent
 from app.agents.complaint import run_complaint_agent
 from app.agents.faq import run_faq_agent
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# Initialize client using new SDK
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 # Map string keys to execution functions
 AGENT_MAPPING = {
@@ -29,7 +31,7 @@ AGENT_MAPPING = {
 }
 
 def route_query(query: str, history: list[dict]) -> list[str]:
-    """Analyzes query + history and returns the list of agents needed (billing, technical, etc.)."""
+    """Analyzes query + history and returns the list of agents needed."""
     history_str = ""
     for msg in history:
         role = "Customer" if msg["role"] == "user" else "Assistant"
@@ -56,10 +58,13 @@ Customer Query: {query}
 JSON Output:"""
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
+        # Use types.GenerateContentConfig for response_mime_type
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
         )
         
         cleaned_response = response.text.strip()
@@ -102,8 +107,10 @@ Customer Query: {query}
 Cohesive Response:"""
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         return response.text.strip()
     except Exception as e:
         print(f"Aggregation failed. Returning concatenated drafts. Error: {str(e)}")
@@ -127,10 +134,8 @@ def process_customer_query(query: str, history: list[dict]) -> dict:
         
     # 4. Synthesize the final response
     if len(triggered_agents) == 1:
-        # Single agent responded, return directly
         final_response = agent_responses[triggered_agents[0]]
     else:
-        # Multiple agents responded, run aggregation
         print("Aggregating responses from multiple agents...")
         final_response = aggregate_responses(query, history, agent_responses)
         
@@ -141,7 +146,6 @@ def process_customer_query(query: str, history: list[dict]) -> dict:
     }
 
 if __name__ == "__main__":
-    # Initialize RAG index before executing test queries
     retriever.initialize()
     
     # Test 1: Single agent triggering (Technical)
