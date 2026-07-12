@@ -1,4 +1,7 @@
 import os
+# Fix for Windows PyTorch OpenMP duplicate initialization crash inside Uvicorn
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager

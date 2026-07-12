@@ -145,7 +145,6 @@ export default function Home() {
 
       const data = await res.json();
       if (!res.ok) {
-        // Intelligently parse array or nested object validation errors to prevent [object Object]
         let errorMessage = 'Authentication failed';
         if (data && data.detail) {
           if (typeof data.detail === 'string') {
@@ -227,9 +226,9 @@ export default function Home() {
         body: JSON.stringify({ content: userText }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
 
+      if (res.ok) {
         const tempAssistantMsg: Message = {
           id: Math.random().toString(),
           role: 'assistant',
@@ -242,14 +241,25 @@ export default function Home() {
         fetchSessions();
         fetchAnalytics();
       } else {
-        throw new Error('Failed to send message');
+        // Parse actual detailed backend error message
+        let errorMessage = 'Failed to get response from agents';
+        if (data && data.detail) {
+          if (typeof data.detail === 'string') {
+            errorMessage = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: any) => err.msg || JSON.stringify(err)).join(', ');
+          } else {
+            errorMessage = JSON.stringify(data.detail);
+          }
+        }
+        throw new Error(errorMessage);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setMessages(prev => [...prev, {
         id: Math.random().toString(),
         role: 'assistant',
-        content: 'Sorry, there was an issue communicating with the agents. Please try again.',
+        content: `Sorry, there was an issue communicating with the agents. Detail: ${err.message || err}`,
         timestamp: new Date().toISOString()
       }]);
     } finally {
