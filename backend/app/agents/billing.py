@@ -1,15 +1,12 @@
 from google import genai
 from app.config import settings
 
-# Initialize client using new SDK
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 def run_billing_agent(query: str, history: list[dict], context: list[dict]) -> str:
-    """Specialized Billing agent that answers queries using RAG context and memory."""
-    # Format the retrieved RAG context
+    """Specialized Billing agent that answers queries using RAG context, with 429 fallback."""
     context_str = "\n\n".join([f"Source: {c['source']} ({c['heading']})\nContent: {c['text']}" for c in context])
     
-    # Format conversation history
     history_str = ""
     for msg in history:
         role = "Customer" if msg["role"] == "user" else "Assistant"
@@ -34,9 +31,16 @@ Instructions:
 
 Answer:"""
     
-    # Generate content using gemini-2.5-flash
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
-    )
-    return response.text.strip()
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',  # Switched to 2.0-flash for 1500/day request limit
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"Billing Agent Gemini call failed: {str(e)}")
+        if context:
+            # Fallback directly to RAG matching contents if API is down or limited
+            docs_summary = "\n\n".join([f"- From {c['source']}: {c['text']}" for c in context])
+            return f"I had trouble reaching the AI network, but here is what I found in our billing documents:\n\n{docs_summary}"
+        return "I am currently having trouble reaching the billing network. Please retry in a few seconds."
