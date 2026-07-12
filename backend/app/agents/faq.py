@@ -4,7 +4,7 @@ from app.config import settings
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 def run_faq_agent(query: str, history: list[dict], context: list[dict]) -> str:
-    """Specialized FAQ agent that replies to basic business operational details."""
+    """Specialized FAQ agent that replies to basic business operational details, with fallback."""
     context_str = "\n\n".join([f"Source: {c['source']} ({c['heading']})\nContent: {c['text']}" for c in context])
     history_str = ""
     for msg in history:
@@ -29,8 +29,15 @@ Instructions:
 
 Answer:"""
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
-    )
-    return response.text.strip()
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"FAQ Agent Gemini call failed: {str(e)}")
+        if context:
+            docs_summary = "\n\n".join([f"- From {c['source']}: {c['text']}" for c in context])
+            return f"I had trouble reaching the AI network, but here is what I found in our policies:\n\n{docs_summary}"
+        return "I am currently having trouble reaching the support network. Please contact support@techmartelectronics.com."
