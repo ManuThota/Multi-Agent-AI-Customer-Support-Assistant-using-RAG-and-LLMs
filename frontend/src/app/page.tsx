@@ -145,11 +145,21 @@ export default function Home() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'Authentication failed');
+        // Intelligently parse array or nested object validation errors to prevent [object Object]
+        let errorMessage = 'Authentication failed';
+        if (data && data.detail) {
+          if (typeof data.detail === 'string') {
+            errorMessage = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: any) => err.msg || JSON.stringify(err)).join(', ');
+          } else {
+            errorMessage = JSON.stringify(data.detail);
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       if (isRegistering) {
-        // Automatically switch and log in after registration
         setIsRegistering(false);
         const loginRes = await fetch('http://127.0.0.1:8000/api/auth/login', {
           method: 'POST',
@@ -199,7 +209,6 @@ export default function Home() {
     setInputMessage('');
     setChatLoading(true);
 
-    // Optimistically add user message to list
     const tempUserMsg: Message = {
       id: Math.random().toString(),
       role: 'user',
@@ -221,7 +230,6 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
 
-        // Add assistant response to message list
         const tempAssistantMsg: Message = {
           id: Math.random().toString(),
           role: 'assistant',
@@ -231,7 +239,6 @@ export default function Home() {
         };
         setMessages(prev => [...prev, tempAssistantMsg]);
 
-        // Refresh session list to update titles if it was the first query
         fetchSessions();
         fetchAnalytics();
       } else {
@@ -239,11 +246,10 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
-      // Remove optimistic message or add error notice
       setMessages(prev => [...prev, {
         id: Math.random().toString(),
         role: 'assistant',
-        content: '⚠️ Sorry, there was an issue communicating with the agents. Please try again.',
+        content: 'Sorry, there was an issue communicating with the agents. Please try again.',
         timestamp: new Date().toISOString()
       }]);
     } finally {
@@ -251,22 +257,19 @@ export default function Home() {
     }
   };
 
-  // Helper to color agent badges
   const getAgentBadgeColor = (agent: string) => {
     switch (agent.toLowerCase()) {
       case 'billing': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'technical': return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
       case 'product': return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
       case 'complaint': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      default: return 'bg-amber-500/10 text-amber-400 border-amber-500/20'; // FAQ
+      default: return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     }
   };
 
-  // --- Auth View (Not Logged In) ---
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen relative flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 bg-[#0B0F19]">
-        {/* Glow ambient background design */}
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
 
@@ -280,7 +283,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Glassmorphism Card */}
           <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.08] shadow-2xl rounded-2xl p-8">
             <h2 className="text-2xl font-bold text-slate-100 mb-6">
               {isRegistering ? 'Create an Account' : 'Welcome Back'}
@@ -367,12 +369,10 @@ export default function Home() {
     );
   }
 
-  // --- Dashboard View (Logged In) ---
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0A0D14]">
-      {/* 1. Sidebar Session History */}
+      {/* Sidebar */}
       <aside className="w-80 bg-slate-950/80 border-r border-white/[0.06] flex flex-col h-full shrink-0">
-        {/* Sidebar Header */}
         <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-violet-500 animate-pulse"></span>
@@ -380,13 +380,11 @@ export default function Home() {
           </div>
         </div>
 
-        {/* New Chat Button */}
         <div className="p-4">
           <button
             onClick={createNewSession}
             className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/[0.08] text-slate-100 font-medium rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
           >
-            {/* Plus Icon SVG */}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
             </svg>
@@ -394,7 +392,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Scrollable List of Sessions */}
         <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-thumb-white/5">
           {sessions.map((session) => (
             <button
@@ -408,7 +405,6 @@ export default function Home() {
                   : 'hover:bg-white/[0.02] border border-transparent text-slate-400 hover:text-slate-200'
                 }`}
             >
-              {/* Chat bubble icon */}
               <svg className="w-5 h-5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
               </svg>
@@ -417,11 +413,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Profile Card Footer */}
         <div className="p-4 border-t border-white/[0.06] bg-slate-950/40 flex items-center justify-between">
           <div className="flex items-center gap-3 truncate">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold shrink-0">
-              {user?.full_name[0].toUpperCase()}
+              {user?.full_name ? user.full_name[0].toUpperCase() : 'U'}
             </div>
             <div className="truncate">
               <div className="text-sm font-semibold text-slate-200 truncate">{user?.full_name}</div>
@@ -433,7 +428,6 @@ export default function Home() {
             className="p-2 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded-lg transition"
             title="Log Out"
           >
-            {/* Logout icon */}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
             </svg>
@@ -441,12 +435,11 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* 2. Main Chat Thread Panel */}
+      {/* Main Workspace */}
       <main className="flex-1 flex flex-col h-full bg-[#0D101D]/40 relative">
-        {/* Glow ambient effects */}
         <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-violet-500/5 blur-[100px] pointer-events-none"></div>
 
-        {/* Top Header Bar */}
+        {/* Top Header */}
         <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 z-10 bg-slate-950/20 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-slate-100 text-lg">
@@ -464,7 +457,6 @@ export default function Home() {
                 : 'bg-white/5 border-white/[0.08] hover:bg-white/10 text-slate-300'
               }`}
           >
-            {/* Analytics Icon */}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
             </svg>
@@ -472,12 +464,10 @@ export default function Home() {
           </button>
         </header>
 
-        {/* Dynamic Display Panel: Analytics or Chat Messages */}
         {showAnalytics ? (
-          /* --- ADMIN ANALYTICS PANEL --- */
+          /* --- ADMIN ANALYTICS --- */
           <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-4xl mx-auto w-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Stat card 1 */}
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Conversations</span>
@@ -490,7 +480,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Stat card 2 */}
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Messages Exchanged</span>
@@ -504,7 +493,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Agent Usage Chart Panel */}
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md">
               <h4 className="font-bold text-slate-200 text-lg mb-6">Specialized Agent Trigger Distribution</h4>
               <div className="space-y-5">
@@ -530,9 +518,8 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* --- CHAT APPLICATION INTERFACE --- */
+          /* --- CHAT VIEW --- */
           <>
-            {/* Scrollable Messages Container */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/5">
               {messages.length === 0 && !chatLoading && (
                 <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
@@ -543,12 +530,11 @@ export default function Home() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-200">How can we assist you today?</h3>
                   <p className="text-sm text-slate-500">
-                    Ask a technical setup question, report a billing dispute, ask product comparison prices, or file a complaint.
+                    Describe your issue. The agent network will parse your request and pull instructions from our documents.
                   </p>
                 </div>
               )}
 
-              {/* Message thread map */}
               {messages.map((message) => {
                 const isUser = message.role === 'user';
                 return (
@@ -557,7 +543,6 @@ export default function Home() {
                         ? 'bg-violet-600 border-violet-500 text-white rounded-br-none'
                         : 'bg-white/[0.02] border-white/[0.06] text-slate-200 rounded-bl-none'
                       }`}>
-                      {/* Meta information for AI messages showing active agents */}
                       {!isUser && message.agents && message.agents.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
                           {message.agents.map((agent) => (
@@ -571,10 +556,8 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* Text content formatted as pre-wrap */}
                       <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
 
-                      {/* Message Timestamp */}
                       <span className="block text-[10px] mt-2 opacity-40 text-right">
                         {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -583,7 +566,6 @@ export default function Home() {
                 );
               })}
 
-              {/* Message Typing Status Loader */}
               {chatLoading && (
                 <div className="flex justify-start">
                   <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl rounded-bl-none px-5 py-4 flex flex-col gap-2">
@@ -602,7 +584,6 @@ export default function Home() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Message Area Footer */}
             <footer className="p-4 border-t border-white/[0.06] bg-slate-950/20 backdrop-blur-md">
               <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex gap-3">
                 <input
@@ -618,7 +599,6 @@ export default function Home() {
                   disabled={!activeSessionId || !inputMessage.trim() || chatLoading}
                   className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {/* Send Arrow SVG */}
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"></path>
                   </svg>
