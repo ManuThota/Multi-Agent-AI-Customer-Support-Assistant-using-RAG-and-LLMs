@@ -58,9 +58,8 @@ Customer Query: {query}
 JSON Output:"""
 
     try:
-        # Use types.GenerateContentConfig for response_mime_type
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',  # Switched to 2.0-flash
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
@@ -108,7 +107,7 @@ Cohesive Response:"""
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',  # Switched to 2.0-flash
             contents=prompt
         )
         return response.text.strip()
@@ -118,21 +117,20 @@ Cohesive Response:"""
 
 def process_customer_query(query: str, history: list[dict]) -> dict:
     """Main orchestrator function: Routes, retrieves context, executes agents, and aggregates results."""
-    # 1. Route the query to the correct agents
     triggered_agents = route_query(query, history)
     print(f"Triggered Agents: {triggered_agents}")
     
-    # 2. Retrieve relevant context from RAG
+    # Retrieve relevant context from RAG
     context = retriever.retrieve(query, top_k=5)
     
-    # 3. Execute each triggered agent
+    # Execute each triggered agent
     agent_responses = {}
     for agent_name in triggered_agents:
         agent_fn = AGENT_MAPPING[agent_name]
         print(f"Running {agent_name} agent...")
         agent_responses[agent_name] = agent_fn(query, history, context)
         
-    # 4. Synthesize the final response
+    # Synthesize the final response
     if len(triggered_agents) == 1:
         final_response = agent_responses[triggered_agents[0]]
     else:
@@ -148,12 +146,6 @@ def process_customer_query(query: str, history: list[dict]) -> dict:
 if __name__ == "__main__":
     retriever.initialize()
     
-    # Test 1: Single agent triggering (Technical)
     print("\n--- Test 1: Technical Query ---")
     res1 = process_customer_query("How do I reset my Smart Hub?", [])
     print(f"Final Reply:\n{res1['response']}")
-    
-    # Test 2: Multi-agent triggering (Billing + Technical)
-    print("\n--- Test 2: Dual-Agent Query (Billing + Technical) ---")
-    res2 = process_customer_query("My account was charged for Premium but my Smart Hub is red and won't turn on.", [])
-    print(f"Final Reply:\n{res2['response']}")
