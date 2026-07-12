@@ -7,7 +7,7 @@ from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from bson import ObjectId
 
@@ -66,15 +66,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Password Hashing & Security ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# --- Direct Bcrypt Hashing ---
 security = HTTPBearer()
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    """Hashes passwords directly using bcrypt."""
+    pw_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(pw_bytes, salt)
+    return hashed.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifies passwords directly using bcrypt."""
+    pw_bytes = plain_password.encode('utf-8')
+    hash_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(pw_bytes, hash_bytes)
 
 def create_access_token(data: dict) -> str:
     """Generates a secure JSON Web Token for the user session."""
@@ -105,6 +111,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     
     return serialize_doc(user)
+
+# --- Standard Status Routes ---
+
+@app.get("/")
+async def root_status():
+    """Welcome endpoint to quickly verify the API server is online."""
+    return {
+        "status": "online",
+        "service": "Multi-Agent Customer Support Assistant API",
+        "documentation": "/docs"
+    }
 
 # --- Authentication Endpoints ---
 
@@ -240,7 +257,6 @@ async def send_chat_message(
     
     # If the session has the default timestamp title, update the title to match first query
     if session["title"].startswith("Chat Session ("):
-        # Auto-summarize or set query as title (first 35 characters)
         new_title = chat_req.content[:35] + ("..." if len(chat_req.content) > 35 else "")
         await sessions_col.update_one({"_id": ObjectId(session_id)}, {"$set": {"title": new_title}})
         
@@ -284,12 +300,4 @@ async def get_analytics(current_user: dict = Depends(get_current_user)):
         "total_messages": total_messages,
         "agent_usage": agent_usage,
         "customer_name": current_user["full_name"]
-    }
-@app.get("/")
-async def root_status():
-    """Welcome endpoint to quickly verify the API server is online."""
-    return {
-        "status": "online",
-        "service": "Multi-Agent Customer Support Assistant API",
-        "documentation": "/docs"
     }
