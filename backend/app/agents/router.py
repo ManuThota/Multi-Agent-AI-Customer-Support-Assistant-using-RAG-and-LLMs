@@ -1,8 +1,6 @@
 import os
 import sys
 import json
-from google import genai
-from google.genai import types
 
 # Add backend directory to sys path to resolve app imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,16 +8,13 @@ backend_dir = os.path.dirname(os.path.dirname(current_dir))
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
-from app.config import settings
 from app.rag.retriever import retriever
 from app.agents.billing import run_billing_agent
 from app.agents.technical import run_technical_agent
 from app.agents.product import run_product_agent
 from app.agents.complaint import run_complaint_agent
 from app.agents.faq import run_faq_agent
-
-# Initialize client using new SDK
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+from app.agents.llm_client import generate_llm_response
 
 # Map string keys to execution functions
 AGENT_MAPPING = {
@@ -58,15 +53,9 @@ Customer Query: {query}
 JSON Output:"""
 
     try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',  # Switched to 2.0-flash
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
-        )
+        # Call via new failover llm client
+        cleaned_response = generate_llm_response(prompt, response_json=True)
         
-        cleaned_response = response.text.strip()
         if cleaned_response.startswith("```json"):
             cleaned_response = cleaned_response[7:]
         if cleaned_response.endswith("```"):
@@ -106,17 +95,13 @@ Customer Query: {query}
 Cohesive Response:"""
 
     try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',  # Switched to 2.0-flash
-            contents=prompt
-        )
-        return response.text.strip()
+        return generate_llm_response(prompt)
     except Exception as e:
         print(f"Aggregation failed. Returning concatenated drafts. Error: {str(e)}")
         return "\n\n".join(agent_responses.values())
 
 def process_customer_query(query: str, history: list[dict]) -> dict:
-    """Main orchestrator function: Routes, retrieves context, executes agents, and aggregates results."""
+    """Main orchestrator: Routes, retrieves context, executes agents, and aggregates results."""
     triggered_agents = route_query(query, history)
     print(f"Triggered Agents: {triggered_agents}")
     
