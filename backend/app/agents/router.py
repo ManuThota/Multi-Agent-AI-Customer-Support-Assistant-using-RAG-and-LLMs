@@ -26,24 +26,33 @@ AGENT_MAPPING = {
 }
 
 def route_query(query: str, history: list[dict]) -> list[str]:
-    """Analyzes query + history and returns the list of agents needed."""
+    """Analyzes query + history and returns the list of agents needed, with classification examples."""
     history_str = ""
     for msg in history:
         role = "Customer" if msg["role"] == "user" else "Assistant"
         history_str += f"{role}: {msg['content']}\n"
         
     prompt = f"""You are the central orchestrator for a multi-agent customer support desk.
-Your job is to analyze the customer's query and conversation history, and output a JSON list of specialized agent names that need to handle this query.
+Your job is to analyze the customer's query and conversation history, and output a JSON object containing a list of specialized agent names that need to handle this query.
 
 Specialized Agents:
-- 'billing': handles payment issues, refunds, subscription charges, invoice problems, Premium Membership renewals.
-- 'technical': handles hardware/software setup, Wi-Fi pairing issues, factory resets, blinking LEDs, error codes.
+- 'billing': handles payment issues, refunds, subscription charges, invoice problems, Premium Membership renewals, locked premium accounts, or credit card charges.
+- 'technical': handles hardware/software setup, Wi-Fi pairing issues, factory resets, blinking LEDs, error codes, device connection errors.
 - 'product': handles specifications of models, comparing devices, sales pricing, stock availability, price matching.
 - 'complaint': handles customers expressing frustration, anger, using caps, criticizing the product/service, demanding a manager.
 - 'faq': handles general shipping options/rates, business hours, retail locations, contact phone numbers/emails.
 
-Return a JSON list containing the names of the required agents. You can trigger one or multiple agents if the query covers multiple areas (e.g. billing charge + technical device failure).
-Output ONLY a raw JSON array. Example: ["billing"] or ["technical", "billing"]. Do not add markdown formatting or wrapper tags.
+Routing Rules & Examples:
+- "Where is my flagship store located?" -> {{"agents": ["faq"]}}
+- "What are the shipping charges for Canada?" -> {{"agents": ["faq"]}}
+- "I want to exchange my laptop, here is my receipt." -> {{"agents": ["billing"]}}
+- "My smart hub LED is blinking red and it won't connect." -> {{"agents": ["technical"]}}
+- "I paid yesterday but Premium is still locked." -> {{"agents": ["billing", "technical"]}}
+- "This device keeps failing, this is awful service. I want a supervisor!" -> {{"agents": ["complaint"]}}
+- "Should I buy the SH-200 smart hub or is there a newer model?" -> {{"agents": ["product"]}}
+
+Return a JSON object with a single key 'agents' containing the names of the required agents. You can trigger one or multiple agents if the query covers multiple areas (e.g. billing charge + technical device failure).
+Output ONLY a raw JSON object. Example: {{"agents": ["billing"]}} or {{"agents": ["technical", "billing"]}}. Do not add markdown formatting or wrapper tags.
 
 Conversation History:
 {history_str}
@@ -62,7 +71,8 @@ JSON Output:"""
             cleaned_response = cleaned_response[:-3]
         cleaned_response = cleaned_response.strip()
         
-        agents = json.loads(cleaned_response)
+        parsed_json = json.loads(cleaned_response)
+        agents = parsed_json.get("agents", [])
         
         if isinstance(agents, list):
             valid_agents = [a for a in agents if a in AGENT_MAPPING]
