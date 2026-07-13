@@ -25,7 +25,6 @@ def generate_llm_response(prompt: str, response_json: bool = False) -> str:
                     contents=prompt
                 )
             
-            # Verify we got a valid response text
             if response.text:
                 return response.text.strip()
         except Exception as e:
@@ -42,7 +41,7 @@ def generate_llm_response(prompt: str, response_json: bool = False) -> str:
             }
             
             data = {
-                "model": "llama-3.3-70b-specdec",  # High-speed Llama-3.3 70B model
+                "model": "llama-3.3-70b-versatile",  # Correct standard model ID
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2
             }
