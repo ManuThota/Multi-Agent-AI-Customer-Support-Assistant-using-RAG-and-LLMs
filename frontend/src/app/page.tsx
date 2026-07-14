@@ -374,15 +374,15 @@ export default function Home() {
     }
   };
 
-  // --- Login & Registration Layout (Teal/Slate + Scrollbars) ---
+  // --- Login & Registration Layout (Centering + Webpage Scrollbars) ---
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 bg-[#0F172A]">
+      <div className="min-h-screen w-full relative flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-[#0F172A] overflow-y-auto">
         {/* Glow ambient background design */}
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-teal-600/10 blur-[120px] pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
 
-        <div className="w-full max-w-md z-10">
+        <div className="w-full max-w-md z-10 my-auto flex flex-col justify-center">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-400 via-emerald-200 to-cyan-400 animate-pulse duration-4000">
               TechMart Support
@@ -392,8 +392,8 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Scroll-safe glassmorphism card */}
-          <div className="max-h-[85vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/5 bg-slate-900/60 backdrop-blur-xl border border-white/[0.08] shadow-2xl rounded-2xl p-8">
+          {/* Clean, auto-height card with no inner scrollbar */}
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-white/[0.08] shadow-2xl rounded-2xl p-8">
             <h2 className="text-2xl font-bold text-slate-100 mb-6">
               {isRegistering ? 'Create an Account' : 'Welcome Back'}
             </h2>
