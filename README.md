@@ -153,3 +153,26 @@ Each support agent uses a resilient API call handler:
 2.  If Gemini fails (Quota Exceeded `429`, server overload, or billing lock), the engine prints `Attempting Groq failover...` in the backend console.
 3.  **Groq (`llama-3.3-70b-versatile`)** takes over transparently and resolves the request within milliseconds.
 4.  If both API calls fail (e.g., offline mode), the agent returns a **formatted, structured summary of the raw retrieved documents** to ensure the customer receives the requested info immediately.
+
+---
+
+## 🌐 Deployment Guidelines
+
+Deploying this multi-agent assistant involves configuring and launching three core components: the database, the backend API service, and the frontend portal.
+
+### 1. Database Setup (MongoDB Atlas)
+*   **Create Cluster**: Launch a free shared cluster on MongoDB Atlas.
+*   **Configure Access**: Create a database user credentials profile with read/write access.
+*   **Network Security**: Whitelist your backend host server's IP address or allow global access (`0.0.0.0/0`).
+*   **Retrieve Connection String**: Copy the MongoDB connection URI for your backend configuration.
+
+### 2. Backend Service Deployment (Render, Railway, or AWS)
+*   **Host Service**: Connect your GitHub repository to a cloud provider and set the project root path to the `backend/` directory.
+*   **Define Variables**: Input the environment keys (`GEMINI_API_KEY`, `GROQ_API_KEY`, the Atlas MongoDB connection URI, and a secure `JWT_SECRET` string) on your hosting dashboard.
+*   **Manage Vector Store**: Ensure the pre-compiled FAISS `vectorstore/` directory is committed to Git so the server loads the indices immediately, or trigger a post-deployment script to compile the documents.
+*   **Configure Port Binding**: Set the startup runtime command to bind Uvicorn to your provider's dynamic PORT environment variable.
+
+### 3. Frontend Deployment (Vercel or Netlify)
+*   **Host Portal**: Connect your repository to Vercel and configure the root directory to point to the `frontend/` folder.
+*   **Set Environment variables**: Add a public API endpoint variable pointing directly to your deployed Backend API URL.
+*   **Build & Publish**: Run the production build compiler on Vercel to optimize and bundle the static pages.
