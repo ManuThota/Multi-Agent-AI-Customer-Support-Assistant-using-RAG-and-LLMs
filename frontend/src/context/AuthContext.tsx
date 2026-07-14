@@ -18,7 +18,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check for saved token on load
         const savedToken = localStorage.getItem('auth_token');
         if (savedToken) {
             setToken(savedToken);
@@ -30,7 +29,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchUserProfile = async (authToken: string) => {
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/analytics', {
+            // Calls the new lightweight user profile endpoint instead of analytics
+            const response = await fetch('http://127.0.0.1:8000/api/auth/me', {
                 headers: {
                     Authorization: `Bearer ${authToken}`,
                 },
@@ -38,15 +38,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (response.ok) {
                 const data = await response.json();
                 setUser({
-                    full_name: data.customer_name,
-                    email: '', // Email not exposed on stats endpoint, but we have name
+                    full_name: data.full_name,
+                    email: data.email,
                 });
             } else {
-                // Token expired or invalid
+                // Token is invalid/expired
                 logout();
             }
         } catch (error) {
             console.error('Failed to fetch profile:', error);
+            logout();
         } finally {
             setLoading(false);
         }
@@ -68,10 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center">
+            <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
                 <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-violet-500/20 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-t-violet-500 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 border-4 border-teal-500/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-t-teal-500 rounded-full animate-spin"></div>
                 </div>
             </div>
         );
