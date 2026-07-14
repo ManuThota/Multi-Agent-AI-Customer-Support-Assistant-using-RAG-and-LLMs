@@ -164,13 +164,17 @@ async def login(credentials: UserLogin):
     access_token = create_access_token(data={"sub": str(user["_id"]), "email": user["email"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Dedicated profile endpoint returning current authenticated user details."""
+    return current_user
+
 # --- Session Management Endpoints ---
 
 @app.post("/api/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_session(session_data: SessionCreate, current_user: dict = Depends(get_current_user)):
     sessions_col = get_sessions_collection()
     
-    # Title defaults to exactly "New Chat"
     title = session_data.title if session_data.title else "New Chat"
     new_session = {
         "title": title,
@@ -195,7 +199,6 @@ async def delete_session(session_id: str, current_user: dict = Depends(get_curre
     sessions_col = get_sessions_collection()
     messages_col = get_messages_collection()
     
-    # Verify ownership before deletion
     session = await sessions_col.find_one({"_id": ObjectId(session_id), "user_id": current_user["id"]})
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -228,12 +231,10 @@ async def send_chat_message(
     sessions_col = get_sessions_collection()
     messages_col = get_messages_collection()
     
-    # 1. Verify session exists
     session = await sessions_col.find_one({"_id": ObjectId(session_id), "user_id": current_user["id"]})
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
         
-    # 2. Retrieve history for memory
     cursor = messages_col.find({"session_id": session_id}).sort("timestamp", -1).limit(15)
     db_history = await cursor.to_list(length=15)
     db_history.reverse()
@@ -243,7 +244,6 @@ async def send_chat_message(
         for msg in db_history
     ]
     
-    # 3. Call multi-agent orchestrator
     try:
         agent_result = process_customer_query(chat_req.content, memory_history)
     except Exception as e:
@@ -252,7 +252,6 @@ async def send_chat_message(
             detail=f"Agent orchestrator failed: {str(e)}"
         )
         
-    # 4. Save user message to database
     user_msg = {
         "session_id": session_id,
         "role": "user",
@@ -261,7 +260,6 @@ async def send_chat_message(
     }
     await messages_col.insert_one(user_msg)
     
-    # 5. Save assistant response + metadata to database
     assistant_msg = {
         "session_id": session_id,
         "role": "assistant",
@@ -271,9 +269,7 @@ async def send_chat_message(
     }
     await messages_col.insert_one(assistant_msg)
     
-    # 6. Automatic Chat Renaming
     if session["title"] == "New Chat":
-        # Call LLM to summarize the conversation into a 2-4 word topic title
         title_prompt = f"""Summarize this customer support conversation into a short, concise 2 to 4 word title.
 Customer query: {chat_req.content}
 Agent response: {agent_result['response'][:250]}
@@ -283,11 +279,9 @@ Title:"""
         try:
             summarized_title = generate_llm_response(title_prompt)
             summarized_title = summarized_title.replace('"', '').replace("'", "").strip()
-            # Safety length filter
             if len(summarized_title) > 35:
                 summarized_title = summarized_title[:32] + "..."
         except Exception:
-            # Fallback
             summarized_title = chat_req.content[:25] + "..."
             
         await sessions_col.update_one({"_id": ObjectId(session_id)}, {"$set": {"title": summarized_title}})
@@ -296,4 +290,35 @@ Title:"""
         "response": agent_result["response"],
         "agents": agent_result["agents"],
         "session_id": session_id
+    }
+
+# --- Analytics Dashboard Endpoint ---
+
+@app.get("/api/analytics")
+async def get_analytics(current_user: dict = Depends(get_current_user)):
+    sessions_col = get_sessions_collection()
+    messages_col = get_messages_collection()
+    
+    user_sessions_cursor = sessions_col.find({"user_id": current_user["id"]})
+    user_sessions = await user_sessions_cursor.to_list(length=1000)
+    session_ids = [str(s["_id"]) for s in user_sessions]
+    
+    total_sessions = len(session_ids)
+    total_messages = 0
+    agent_usage = {"billing": 0, "technical": 0, "product": 0, "complaint": 0, "faq": 0}
+    
+    if total_sessions > 0:
+        total_messages = await messages_col.count_documents({"session_id": {"$in": session_ids}})
+        cursor = messages_col.find({"session_id": {"$in": session_ids}, "role": "assistant"})
+        async for msg in cursor:
+            agents = msg.get("agents") or []
+            for agent in agents:
+                if agent in agent_usage:
+                    agent_usage[agent] += 1
+                    
+    return {
+        "total_sessions": total_sessions,
+        "total_messages": total_messages,
+        "agent_usage": agent_usage,
+        "customer_name": current_user["full_name"]
     }
