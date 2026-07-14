@@ -1,10 +1,7 @@
-from google import genai
-from app.config import settings
-
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+from app.agents.llm_client import generate_llm_response
 
 def run_billing_agent(query: str, history: list[dict], context: list[dict]) -> str:
-    """Specialized Billing agent that answers queries using RAG context, with 429 fallback."""
+    """Specialized Billing agent that answers queries using RAG context."""
     context_str = "\n\n".join([f"Source: {c['source']} ({c['heading']})\nContent: {c['text']}" for c in context])
     
     history_str = ""
@@ -32,15 +29,10 @@ Instructions:
 Answer:"""
     
     try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',  # Switched to 2.0-flash for 1500/day request limit
-            contents=prompt
-        )
-        return response.text.strip()
+        return generate_llm_response(prompt)
     except Exception as e:
-        print(f"Billing Agent Gemini call failed: {str(e)}")
+        print(f"Billing Agent LLM call failed: {str(e)}")
         if context:
-            # Fallback directly to RAG matching contents if API is down or limited
             docs_summary = "\n\n".join([f"- From {c['source']}: {c['text']}" for c in context])
             return f"I had trouble reaching the AI network, but here is what I found in our billing documents:\n\n{docs_summary}"
         return "I am currently having trouble reaching the billing network. Please retry in a few seconds."
