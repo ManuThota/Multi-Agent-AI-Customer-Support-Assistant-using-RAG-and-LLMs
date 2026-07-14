@@ -1,7 +1,7 @@
 import os
 # Fix for Windows PyTorch OpenMP duplicate initialization crash inside Uvicorn
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-import os
+
 import sys
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
@@ -41,6 +41,7 @@ from app.models.schemas import (
     MessageResponse
 )
 from app.agents.router import process_customer_query
+from app.agents.llm_client import generate_llm_response
 from app.rag.retriever import retriever
 
 # --- Lifespan for Startup and Shutdown ---
@@ -60,10 +61,9 @@ app = FastAPI(
 )
 
 # --- CORS Middleware ---
-# Allows Next.js frontend running on port 3000 to interact with port 8000
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, change to frontend domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,7 +115,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     return serialize_doc(user)
 
-# --- Standard Status Routes ---
+# --- Status Route ---
 
 @app.get("/")
 async def root_status():
@@ -132,7 +132,6 @@ async def root_status():
 async def register(user_data: UserRegister):
     users_col = get_users_collection()
     
-    # Check if email is already registered
     existing_user = await users_col.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(
@@ -171,7 +170,8 @@ async def login(credentials: UserLogin):
 async def create_session(session_data: SessionCreate, current_user: dict = Depends(get_current_user)):
     sessions_col = get_sessions_collection()
     
-    title = session_data.title if session_data.title else f"Chat Session ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+    # Title defaults to exactly "New Chat"
+    title = session_data.title if session_data.title else "New Chat"
     new_session = {
         "title": title,
         "user_id": current_user["id"],
@@ -189,12 +189,26 @@ async def list_sessions(current_user: dict = Depends(get_current_user)):
     sessions = await cursor.to_list(length=100)
     return serialize_list(sessions)
 
+@app.delete("/api/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: str, current_user: dict = Depends(get_current_user)):
+    """Deletes a chat session and all its associated messages."""
+    sessions_col = get_sessions_collection()
+    messages_col = get_messages_collection()
+    
+    # Verify ownership before deletion
+    session = await sessions_col.find_one({"_id": ObjectId(session_id), "user_id": current_user["id"]})
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        
+    await sessions_col.delete_one({"_id": ObjectId(session_id)})
+    await messages_col.delete_many({"session_id": session_id})
+    return
+
 @app.get("/api/sessions/{session_id}/history", response_model=List[MessageResponse])
 async def get_session_history(session_id: str, current_user: dict = Depends(get_current_user)):
     sessions_col = get_sessions_collection()
     messages_col = get_messages_collection()
     
-    # Verify session belongs to requesting user
     session = await sessions_col.find_one({"_id": ObjectId(session_id), "user_id": current_user["id"]})
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -214,17 +228,16 @@ async def send_chat_message(
     sessions_col = get_sessions_collection()
     messages_col = get_messages_collection()
     
-    # 1. Verify session exists and belongs to current user
+    # 1. Verify session exists
     session = await sessions_col.find_one({"_id": ObjectId(session_id), "user_id": current_user["id"]})
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
         
-    # 2. Retrieve last 15 messages of conversation history for memory
+    # 2. Retrieve history for memory
     cursor = messages_col.find({"session_id": session_id}).sort("timestamp", -1).limit(15)
     db_history = await cursor.to_list(length=15)
-    db_history.reverse()  # Restore chronological order
+    db_history.reverse()
     
-    # Format memory for the agent orchestrator
     memory_history = [
         {"role": msg["role"], "content": msg["content"]} 
         for msg in db_history
@@ -258,49 +271,29 @@ async def send_chat_message(
     }
     await messages_col.insert_one(assistant_msg)
     
-    # If the session has the default timestamp title, update the title to match first query
-    if session["title"].startswith("Chat Session ("):
-        new_title = chat_req.content[:35] + ("..." if len(chat_req.content) > 35 else "")
-        await sessions_col.update_one({"_id": ObjectId(session_id)}, {"$set": {"title": new_title}})
+    # 6. Automatic Chat Renaming
+    if session["title"] == "New Chat":
+        # Call LLM to summarize the conversation into a 2-4 word topic title
+        title_prompt = f"""Summarize this customer support conversation into a short, concise 2 to 4 word title.
+Customer query: {chat_req.content}
+Agent response: {agent_result['response'][:250]}
+
+Output ONLY the 2-4 word title. Do not include quotes, dashes, or markdown.
+Title:"""
+        try:
+            summarized_title = generate_llm_response(title_prompt)
+            summarized_title = summarized_title.replace('"', '').replace("'", "").strip()
+            # Safety length filter
+            if len(summarized_title) > 35:
+                summarized_title = summarized_title[:32] + "..."
+        except Exception:
+            # Fallback
+            summarized_title = chat_req.content[:25] + "..."
+            
+        await sessions_col.update_one({"_id": ObjectId(session_id)}, {"$set": {"title": summarized_title}})
         
     return {
         "response": agent_result["response"],
         "agents": agent_result["agents"],
         "session_id": session_id
-    }
-
-# --- Analytics Dashboard Endpoint ---
-
-@app.get("/api/analytics")
-async def get_analytics(current_user: dict = Depends(get_current_user)):
-    sessions_col = get_sessions_collection()
-    messages_col = get_messages_collection()
-    
-    # Retrieve user's sessions
-    user_sessions_cursor = sessions_col.find({"user_id": current_user["id"]})
-    user_sessions = await user_sessions_cursor.to_list(length=1000)
-    session_ids = [str(s["_id"]) for s in user_sessions]
-    
-    total_sessions = len(session_ids)
-    
-    # Count messages associated with these sessions
-    total_messages = 0
-    agent_usage = {"billing": 0, "technical": 0, "product": 0, "complaint": 0, "faq": 0}
-    
-    if total_sessions > 0:
-        total_messages = await messages_col.count_documents({"session_id": {"$in": session_ids}})
-        
-        # Count agent trigger distributions
-        cursor = messages_col.find({"session_id": {"$in": session_ids}, "role": "assistant"})
-        async for msg in cursor:
-            agents = msg.get("agents") or []
-            for agent in agents:
-                if agent in agent_usage:
-                    agent_usage[agent] += 1
-                    
-    return {
-        "total_sessions": total_sessions,
-        "total_messages": total_messages,
-        "agent_usage": agent_usage,
-        "customer_name": current_user["full_name"]
     }
