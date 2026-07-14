@@ -18,6 +18,116 @@ interface Message {
   timestamp: string;
 }
 
+// --- Zero-Dependency Markdown Renderer ---
+const renderFormattedMessage = (content: string) => {
+  const lines = content.split('\n');
+  let inList = false;
+  let inOrderedList = false;
+  const listItems: React.ReactNode[] = [];
+  const renderedElements: React.ReactNode[] = [];
+
+  const flushLists = (key: string) => {
+    if (inList) {
+      renderedElements.push(
+        <ul key={`ul-${key}`} className="list-disc pl-5 my-2 space-y-1.5 text-slate-300">
+          {[...listItems]}
+        </ul>
+      );
+      listItems.length = 0;
+      inList = false;
+    }
+    if (inOrderedList) {
+      renderedElements.push(
+        <ol key={`ol-${key}`} className="list-decimal pl-5 my-2 space-y-1.5 text-slate-300">
+          {[...listItems]}
+        </ol>
+      );
+      listItems.length = 0;
+      inOrderedList = false;
+    }
+  };
+
+  const parseInlineMarkdown = (text: string): React.ReactNode[] => {
+    // Parse bold (**text**) and italic (*text*)
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-bold text-slate-100">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={index} className="italic text-slate-300">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    // Headers
+    if (trimmed.startsWith('### ')) {
+      flushLists(index.toString());
+      renderedElements.push(
+        <h3 key={index} className="text-sm font-bold text-violet-400 mt-4 mb-2">
+          {parseInlineMarkdown(trimmed.slice(4))}
+        </h3>
+      );
+    } else if (trimmed.startsWith('## ')) {
+      flushLists(index.toString());
+      renderedElements.push(
+        <h2 key={index} className="text-base font-bold text-slate-200 mt-5 mb-2 border-b border-white/5 pb-1">
+          {parseInlineMarkdown(trimmed.slice(3))}
+        </h2>
+      );
+    } else if (trimmed.startsWith('# ')) {
+      flushLists(index.toString());
+      renderedElements.push(
+        <h1 key={index} className="text-lg font-extrabold text-white mt-6 mb-3">
+          {parseInlineMarkdown(trimmed.slice(2))}
+        </h1>
+      );
+    }
+    // Bullet Lists
+    else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      if (inOrderedList) flushLists(index.toString());
+      inList = true;
+      listItems.push(
+        <li key={index} className="text-sm leading-relaxed">
+          {parseInlineMarkdown(trimmed.slice(2))}
+        </li>
+      );
+    }
+    // Numbered Lists
+    else if (/^\d+\.\s/.test(trimmed)) {
+      if (inList) flushLists(index.toString());
+      inOrderedList = true;
+      const match = trimmed.match(/^\d+\.\s(.*)/);
+      const textContent = match ? match[1] : trimmed;
+      listItems.push(
+        <li key={index} className="text-sm leading-relaxed">
+          {parseInlineMarkdown(textContent)}
+        </li>
+      );
+    }
+    // Blank lines
+    else if (trimmed === '') {
+      flushLists(index.toString());
+    }
+    // Standard paragraph line
+    else {
+      flushLists(index.toString());
+      renderedElements.push(
+        <p key={index} className="text-sm leading-relaxed text-slate-300 mb-2">
+          {parseInlineMarkdown(line)}
+        </p>
+      );
+    }
+  });
+
+  flushLists('end');
+  return <div className="space-y-1">{renderedElements}</div>;
+};
+
 export default function Home() {
   const { token, user, isAuthenticated, login, logout } = useAuth();
 
@@ -459,7 +569,10 @@ export default function Home() {
                     </div>
                   )}
 
-                  <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
+                  {/* Render using the Custom Markdown Formatter */}
+                  <div className="text-sm leading-relaxed">
+                    {renderFormattedMessage(message.content)}
+                  </div>
 
                   <span className="block text-[10px] mt-2 opacity-40 text-right">
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
