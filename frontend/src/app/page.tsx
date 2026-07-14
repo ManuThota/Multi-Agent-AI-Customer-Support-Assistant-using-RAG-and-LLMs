@@ -18,18 +18,6 @@ interface Message {
   timestamp: string;
 }
 
-interface Analytics {
-  total_sessions: number;
-  total_messages: number;
-  agent_usage: {
-    billing: number;
-    technical: number;
-    product: number;
-    complaint: number;
-    faq: number;
-  };
-}
-
 export default function Home() {
   const { token, user, isAuthenticated, login, logout } = useAuth();
 
@@ -48,10 +36,6 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
 
-  // Panel States
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analyticsData, setAnalyticsData] = useState<Analytics | null>(null);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom helper
@@ -63,7 +47,6 @@ export default function Home() {
   useEffect(() => {
     if (isAuthenticated && token) {
       fetchSessions();
-      fetchAnalytics();
     }
   }, [isAuthenticated, token]);
 
@@ -106,20 +89,6 @@ export default function Home() {
       }
     } catch (e) {
       console.error('Error fetching history:', e);
-    }
-  };
-
-  const fetchAnalytics = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/analytics', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAnalyticsData(data);
-      }
-    } catch (e) {
-      console.error('Error fetching analytics:', e);
     }
   };
 
@@ -193,7 +162,6 @@ export default function Home() {
         const newSession = await res.json();
         setSessions(prev => [newSession, ...prev]);
         setActiveSessionId(newSession.id);
-        setShowAnalytics(false);
       }
     } catch (e) {
       console.error('Error creating session:', e);
@@ -237,11 +205,8 @@ export default function Home() {
           timestamp: new Date().toISOString(),
         };
         setMessages(prev => [...prev, tempAssistantMsg]);
-
         fetchSessions();
-        fetchAnalytics();
       } else {
-        // Parse actual detailed backend error message
         let errorMessage = 'Failed to get response from agents';
         if (data && data.detail) {
           if (typeof data.detail === 'string') {
@@ -408,9 +373,8 @@ export default function Home() {
               key={session.id}
               onClick={() => {
                 setActiveSessionId(session.id);
-                setShowAnalytics(false);
               }}
-              className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition ${activeSessionId === session.id && !showAnalytics
+              className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition ${activeSessionId === session.id
                   ? 'bg-violet-600/20 border border-violet-500/20 text-white'
                   : 'hover:bg-white/[0.02] border border-transparent text-slate-400 hover:text-slate-200'
                 }`}
@@ -453,170 +417,97 @@ export default function Home() {
         <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 z-10 bg-slate-950/20 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-slate-100 text-lg">
-              {showAnalytics ? 'Analytics Dashboard' : (sessions.find(s => s.id === activeSessionId)?.title || 'Chat Desk')}
+              {sessions.find(s => s.id === activeSessionId)?.title || 'Chat Desk'}
             </h1>
           </div>
-
-          <button
-            onClick={() => {
-              setShowAnalytics(!showAnalytics);
-              if (!showAnalytics) fetchAnalytics();
-            }}
-            className={`py-2 px-4 rounded-xl border flex items-center gap-2 text-xs font-semibold transition ${showAnalytics
-                ? 'bg-violet-600 border-violet-500 text-white'
-                : 'bg-white/5 border-white/[0.08] hover:bg-white/10 text-slate-300'
-              }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            {showAnalytics ? 'Back to Chat' : 'Admin Panel'}
-          </button>
         </header>
 
-        {showAnalytics ? (
-          /* --- ADMIN ANALYTICS --- */
-          <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-4xl mx-auto w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Conversations</span>
-                  <h3 className="text-4xl font-extrabold text-white mt-1">{analyticsData?.total_sessions || 0}</h3>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
-                  </svg>
+        {/* Chat Interface */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/5">
+          {messages.length === 0 && !chatLoading && (
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-xl shadow-violet-500/5">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-slate-200">How can we assist you today?</h3>
+              <p className="text-sm text-slate-500">
+                Describe your issue. The agent network will parse your request and pull instructions from our documents.
+              </p>
+            </div>
+          )}
+
+          {messages.map((message) => {
+            const isUser = message.role === 'user';
+            return (
+              <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[75%] rounded-2xl px-5 py-4 border shadow-sm ${isUser
+                    ? 'bg-violet-600 border-violet-500 text-white rounded-br-none'
+                    : 'bg-white/[0.02] border-white/[0.06] text-slate-200 rounded-bl-none'
+                  }`}>
+                  {!isUser && message.agents && message.agents.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {message.agents.map((agent) => (
+                        <span
+                          key={agent}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getAgentBadgeColor(agent)}`}
+                        >
+                          {agent} Agent
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
+
+                  <span className="block text-[10px] mt-2 opacity-40 text-right">
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               </div>
+            );
+          })}
 
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Messages Exchanged</span>
-                  <h3 className="text-4xl font-extrabold text-white mt-1">{analyticsData?.total_messages || 0}</h3>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                  </svg>
+          {chatLoading && (
+            <div className="flex justify-start">
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl rounded-bl-none px-5 py-4 flex flex-col gap-2">
+                <span className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">
+                  Routing and Processing request...
+                </span>
+                <div className="flex items-center gap-1.5 py-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '300ms' }}></span>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 backdrop-blur-md">
-              <h4 className="font-bold text-slate-200 text-lg mb-6">Specialized Agent Trigger Distribution</h4>
-              <div className="space-y-5">
-                {analyticsData && Object.entries(analyticsData.agent_usage).map(([agent, count]) => {
-                  const maxVal = Math.max(...Object.values(analyticsData.agent_usage), 1);
-                  const percentage = (count / maxVal) * 100;
-                  return (
-                    <div key={agent} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="capitalize font-medium text-slate-300">{agent} Agent</span>
-                        <span className="font-semibold text-white">{count} triggers</span>
-                      </div>
-                      <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-white/[0.04]">
-                        <div
-                          className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* --- CHAT VIEW --- */
-          <>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/5">
-              {messages.length === 0 && !chatLoading && (
-                <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
-                  <div className="w-16 h-16 rounded-2xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-xl shadow-violet-500/5">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-200">How can we assist you today?</h3>
-                  <p className="text-sm text-slate-500">
-                    Describe your issue. The agent network will parse your request and pull instructions from our documents.
-                  </p>
-                </div>
-              )}
+          <div ref={messagesEndRef} />
+        </div>
 
-              {messages.map((message) => {
-                const isUser = message.role === 'user';
-                return (
-                  <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-5 py-4 border shadow-sm ${isUser
-                        ? 'bg-violet-600 border-violet-500 text-white rounded-br-none'
-                        : 'bg-white/[0.02] border-white/[0.06] text-slate-200 rounded-bl-none'
-                      }`}>
-                      {!isUser && message.agents && message.agents.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {message.agents.map((agent) => (
-                            <span
-                              key={agent}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getAgentBadgeColor(agent)}`}
-                            >
-                              {agent} Agent
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
-
-                      <span className="block text-[10px] mt-2 opacity-40 text-right">
-                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl rounded-bl-none px-5 py-4 flex flex-col gap-2">
-                    <span className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">
-                      Routing and Processing request...
-                    </span>
-                    <div className="flex items-center gap-1.5 py-1">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-500 animate-bounce duration-500" style={{ animationDelay: '300ms' }}></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            <footer className="p-4 border-t border-white/[0.06] bg-slate-950/20 backdrop-blur-md">
-              <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex gap-3">
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder={activeSessionId ? "Describe your support issue..." : "Create a new session to begin chatting."}
-                  disabled={!activeSessionId || chatLoading}
-                  className="flex-1 px-4 py-3 bg-slate-950 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <button
-                  type="submit"
-                  disabled={!activeSessionId || !inputMessage.trim() || chatLoading}
-                  className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"></path>
-                  </svg>
-                </button>
-              </form>
-            </footer>
-          </>
-        )}
+        <footer className="p-4 border-t border-white/[0.06] bg-slate-950/20 backdrop-blur-md">
+          <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex gap-3">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder={activeSessionId ? "Describe your support issue..." : "Create a new session to begin chatting."}
+              disabled={!activeSessionId || chatLoading}
+              className="flex-1 px-4 py-3 bg-slate-950 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <button
+              type="submit"
+              disabled={!activeSessionId || !inputMessage.trim() || chatLoading}
+              className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"></path>
+              </svg>
+            </button>
+          </form>
+        </footer>
       </main>
     </div>
   );
