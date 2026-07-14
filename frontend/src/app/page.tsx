@@ -48,7 +48,6 @@ const renderFormattedMessage = (content: string) => {
   };
 
   const parseInlineMarkdown = (text: string): React.ReactNode[] => {
-    // Parse bold (**text**) and italic (*text*)
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
@@ -68,7 +67,7 @@ const renderFormattedMessage = (content: string) => {
     if (trimmed.startsWith('### ')) {
       flushLists(index.toString());
       renderedElements.push(
-        <h3 key={index} className="text-sm font-bold text-violet-400 mt-4 mb-2">
+        <h3 key={index} className="text-sm font-bold text-teal-400 mt-4 mb-2">
           {parseInlineMarkdown(trimmed.slice(4))}
         </h3>
       );
@@ -113,7 +112,7 @@ const renderFormattedMessage = (content: string) => {
     else if (trimmed === '') {
       flushLists(index.toString());
     }
-    // Standard paragraph line
+    // Standard paragraph
     else {
       flushLists(index.toString());
       renderedElements.push(
@@ -278,6 +277,29 @@ export default function Home() {
     }
   };
 
+  const deleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Stop parent div click from selecting the session
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
+        if (activeSessionId === sessionId) {
+          const remaining = sessions.filter(s => s.id !== sessionId);
+          if (remaining.length > 0) {
+            setActiveSessionId(remaining[0].id);
+          } else {
+            setActiveSessionId(null);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting session:', err);
+    }
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() || !activeSessionId || chatLoading) return;
@@ -345,22 +367,24 @@ export default function Home() {
   const getAgentBadgeColor = (agent: string) => {
     switch (agent.toLowerCase()) {
       case 'billing': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'technical': return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
-      case 'product': return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
+      case 'technical': return 'bg-teal-500/10 text-teal-400 border-teal-500/20';
+      case 'product': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
       case 'complaint': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      default: return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      default: return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
     }
   };
 
+  // --- Login & Registration Layout (Teal/Slate + Scrollbars) ---
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 bg-[#0B0F19]">
-        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
+      <div className="min-h-screen relative flex items-center justify-center overflow-hidden py-12 px-4 sm:px-6 lg:px-8 bg-[#0F172A]">
+        {/* Glow ambient background design */}
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-teal-600/10 blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
 
         <div className="w-full max-w-md z-10">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-violet-400 via-indigo-200 to-sky-400">
+            <h1 className="text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-400 via-emerald-200 to-cyan-400 animate-pulse duration-4000">
               TechMart Support
             </h1>
             <p className="mt-2 text-sm text-slate-400">
@@ -368,7 +392,8 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.08] shadow-2xl rounded-2xl p-8">
+          {/* Scroll-safe glassmorphism card */}
+          <div className="max-h-[85vh] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/5 bg-slate-900/60 backdrop-blur-xl border border-white/[0.08] shadow-2xl rounded-2xl p-8">
             <h2 className="text-2xl font-bold text-slate-100 mb-6">
               {isRegistering ? 'Create an Account' : 'Welcome Back'}
             </h2>
@@ -389,7 +414,7 @@ export default function Home() {
                     value={authName}
                     onChange={(e) => setAuthName(e.target.value)}
                     placeholder="John Doe"
-                    className="w-full px-4 py-3 bg-slate-900/60 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition text-slate-100 placeholder-slate-500"
+                    className="w-full px-4 py-3 bg-slate-950/80 border border-white/[0.08] rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition text-slate-100 placeholder-slate-500"
                   />
                 </div>
               )}
@@ -402,7 +427,7 @@ export default function Home() {
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full px-4 py-3 bg-slate-900/60 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition text-slate-100 placeholder-slate-500"
+                  className="w-full px-4 py-3 bg-slate-950/80 border border-white/[0.08] rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition text-slate-100 placeholder-slate-500"
                 />
               </div>
 
@@ -414,14 +439,14 @@ export default function Home() {
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 bg-slate-900/60 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition text-slate-100 placeholder-slate-500"
+                  className="w-full px-4 py-3 bg-slate-950/80 border border-white/[0.08] rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition text-slate-100 placeholder-slate-500"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium rounded-xl focus:outline-none transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-2 py-3 px-4 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-medium rounded-xl focus:outline-none transition-all duration-200 transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {authLoading ? (
                   <div className="flex items-center justify-center">
@@ -443,7 +468,7 @@ export default function Home() {
                   setIsRegistering(!isRegistering);
                   setAuthError('');
                 }}
-                className="text-violet-400 hover:text-violet-300 font-medium transition"
+                className="text-teal-400 hover:text-teal-300 font-medium transition"
               >
                 {isRegistering ? 'Already have an account? Sign In' : "Don't have an account? Register"}
               </button>
@@ -454,21 +479,24 @@ export default function Home() {
     );
   }
 
+  // --- Main Chat Dashboard (Teal & Slate) ---
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0A0D14]">
-      {/* Sidebar */}
-      <aside className="w-80 bg-slate-950/80 border-r border-white/[0.06] flex flex-col h-full shrink-0">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0A0E17]">
+      {/* 1. Sidebar Session History */}
+      <aside className="w-80 bg-slate-950/90 border-r border-white/[0.06] flex flex-col h-full shrink-0">
+        {/* Sidebar Header */}
         <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-violet-500 animate-pulse"></span>
-            <h2 className="font-bold text-slate-100 tracking-wide text-sm uppercase">TechMart Agent Network</h2>
+            <span className="w-3 h-3 rounded-full bg-teal-500 animate-pulse"></span>
+            <h2 className="font-bold text-slate-200 tracking-wide text-xs uppercase">TechMart Support Desk</h2>
           </div>
         </div>
 
+        {/* New Session Button */}
         <div className="p-4">
           <button
             onClick={createNewSession}
-            className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/[0.08] text-slate-100 font-medium rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
+            className="w-full py-3 px-4 bg-teal-950/20 hover:bg-teal-900/20 border border-teal-500/20 hover:border-teal-500/40 text-teal-400 hover:text-teal-300 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -477,29 +505,44 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-thumb-white/5">
+        {/* Scrollable Session List */}
+        <div className="flex-1 overflow-y-auto px-2 space-y-1.5 scrollbar-thin scrollbar-thumb-white/5">
           {sessions.map((session) => (
-            <button
+            <div
               key={session.id}
               onClick={() => {
                 setActiveSessionId(session.id);
               }}
-              className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition ${activeSessionId === session.id
-                  ? 'bg-violet-600/20 border border-violet-500/20 text-white'
-                  : 'hover:bg-white/[0.02] border border-transparent text-slate-400 hover:text-slate-200'
+              className={`w-full group text-left p-3 rounded-xl flex items-center justify-between transition cursor-pointer border ${activeSessionId === session.id
+                  ? 'bg-teal-950/30 border-teal-500/20 text-white'
+                  : 'hover:bg-white/[0.02] border-transparent text-slate-400 hover:text-slate-200'
                 }`}
             >
-              <svg className="w-5 h-5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-              </svg>
-              <div className="truncate text-sm font-medium">{session.title}</div>
-            </button>
+              <div className="flex items-center gap-3 truncate">
+                <svg className="w-5 h-5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                <div className="truncate text-sm font-medium">{session.title}</div>
+              </div>
+
+              {/* Delete Icon (shows on hover of item) */}
+              <button
+                onClick={(e) => deleteSession(e, session.id)}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 rounded transition"
+                title="Delete Session"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </button>
+            </div>
           ))}
         </div>
 
+        {/* Sidebar Profile Card Footer */}
         <div className="p-4 border-t border-white/[0.06] bg-slate-950/40 flex items-center justify-between">
           <div className="flex items-center gap-3 truncate">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold shrink-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-white font-bold shrink-0">
               {user?.full_name ? user.full_name[0].toUpperCase() : 'U'}
             </div>
             <div className="truncate">
@@ -519,9 +562,9 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* Main Workspace */}
-      <main className="flex-1 flex flex-col h-full bg-[#0D101D]/40 relative">
-        <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-violet-500/5 blur-[100px] pointer-events-none"></div>
+      {/* 2. Chat Area */}
+      <main className="flex-1 flex flex-col h-full bg-[#0F172A]/30 relative">
+        <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-teal-500/5 blur-[100px] pointer-events-none"></div>
 
         {/* Top Header */}
         <header className="h-16 border-b border-white/[0.06] flex items-center justify-between px-6 z-10 bg-slate-950/20 backdrop-blur-md">
@@ -532,18 +575,18 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Chat Interface */}
+        {/* Scrollable Message Thread */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-white/5">
           {messages.length === 0 && !chatLoading && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-xl shadow-violet-500/5">
+              <div className="w-16 h-16 rounded-2xl bg-teal-600/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shadow-xl shadow-teal-500/5">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-slate-200">How can we assist you today?</h3>
               <p className="text-sm text-slate-500">
-                Describe your issue. The agent network will parse your request and pull instructions from our documents.
+                Describe your issue. Our specialized agent network will classify your query and retrieve solutions from company documentation.
               </p>
             </div>
           )}
@@ -553,7 +596,7 @@ export default function Home() {
             return (
               <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] rounded-2xl px-5 py-4 border shadow-sm ${isUser
-                    ? 'bg-violet-600 border-violet-500 text-white rounded-br-none'
+                    ? 'bg-gradient-to-r from-teal-600 to-cyan-600 border-teal-500/10 text-white rounded-br-none'
                     : 'bg-white/[0.02] border-white/[0.06] text-slate-200 rounded-bl-none'
                   }`}>
                   {!isUser && message.agents && message.agents.length > 0 && (
@@ -569,7 +612,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Render using the Custom Markdown Formatter */}
+                  {/* Styled Markdown Output */}
                   <div className="text-sm leading-relaxed">
                     {renderFormattedMessage(message.content)}
                   </div>
@@ -585,7 +628,7 @@ export default function Home() {
           {chatLoading && (
             <div className="flex justify-start">
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl rounded-bl-none px-5 py-4 flex flex-col gap-2">
-                <span className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">
+                <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider">
                   Routing and Processing request...
                 </span>
                 <div className="flex items-center gap-1.5 py-1">
@@ -600,6 +643,7 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Input Bar */}
         <footer className="p-4 border-t border-white/[0.06] bg-slate-950/20 backdrop-blur-md">
           <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex gap-3">
             <input
@@ -608,12 +652,12 @@ export default function Home() {
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder={activeSessionId ? "Describe your support issue..." : "Create a new session to begin chatting."}
               disabled={!activeSessionId || chatLoading}
-              className="flex-1 px-4 py-3 bg-slate-950 border border-white/[0.08] rounded-xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-3 bg-slate-950 border border-white/[0.08] rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-slate-200 placeholder-slate-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="submit"
               disabled={!activeSessionId || !inputMessage.trim() || chatLoading}
-              className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white font-medium rounded-xl flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-medium rounded-xl flex items-center justify-center transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9-2-9-18-9 18 9-2zm0 0v-8"></path>
