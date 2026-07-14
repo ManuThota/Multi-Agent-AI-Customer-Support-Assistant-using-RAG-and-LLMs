@@ -156,23 +156,79 @@ Each support agent uses a resilient API call handler:
 
 ---
 
-## 🌐 Deployment Guidelines
+##  Deployment Guide
 
-Deploying this multi-agent assistant involves configuring and launching three core components: the database, the backend API service, and the frontend portal.
+### Option A: Containerized Deployment (Docker & Docker Compose)
+The easiest way to self-host the entire stack (FastAPI + Next.js + MongoDB) is using Docker Compose.
 
-### 1. Database Setup (MongoDB Atlas)
-*   **Create Cluster**: Launch a free shared cluster on MongoDB Atlas.
-*   **Configure Access**: Create a database user credentials profile with read/write access.
-*   **Network Security**: Whitelist your backend host server's IP address or allow global access (`0.0.0.0/0`).
-*   **Retrieve Connection String**: Copy the MongoDB connection URI for your backend configuration.
+1. **Create a `docker-compose.yml`** at the project root:
+   ```yaml
+   version: '3.8'
+   services:
+     mongodb:
+       image: mongo:6.0
+       ports:
+         - "27017:27017"
+       volumes:
+         - mongo_data:/data/db
+       networks:
+         - support_network
 
-### 2. Backend Service Deployment (Render, Railway, or AWS)
-*   **Host Service**: Connect your GitHub repository to a cloud provider and set the project root path to the `backend/` directory.
-*   **Define Variables**: Input the environment keys (`GEMINI_API_KEY`, `GROQ_API_KEY`, the Atlas MongoDB connection URI, and a secure `JWT_SECRET` string) on your hosting dashboard.
-*   **Manage Vector Store**: Ensure the pre-compiled FAISS `vectorstore/` directory is committed to Git so the server loads the indices immediately, or trigger a post-deployment script to compile the documents.
-*   **Configure Port Binding**: Set the startup runtime command to bind Uvicorn to your provider's dynamic PORT environment variable.
+     backend:
+       build: ./backend
+       ports:
+         - "8000:8000"
+       environment:
+         - GEMINI_API_KEY=${GEMINI_API_KEY}
+         - GROQ_API_KEY=${GROQ_API_KEY}
+         - MONGODB_URL=mongodb://mongodb:27017
+       depends_on:
+         - mongodb
+       volumes:
+         - ./backend/vectorstore:/app/vectorstore
+       networks:
+         - support_network
 
-### 3. Frontend Deployment (Vercel or Netlify)
-*   **Host Portal**: Connect your repository to Vercel and configure the root directory to point to the `frontend/` folder.
-*   **Set Environment variables**: Add a public API endpoint variable pointing directly to your deployed Backend API URL.
-*   **Build & Publish**: Run the production build compiler on Vercel to optimize and bundle the static pages.
+     frontend:
+       build: ./frontend
+       ports:
+         - "3000:3000"
+       environment:
+         - NEXT_PUBLIC_API_URL=http://localhost:8000
+       depends_on:
+         - backend
+       networks:
+         - support_network
+
+   volumes:
+     mongo_data:
+
+   networks:
+     support_network:
+       driver: bridge
+   ```
+2. **Build and Run the Containers**:
+   ```bash
+   docker-compose up -d --build
+   ```
+
+---
+
+### Option B: Cloud Production Deployment
+
+#### 1. Database: MongoDB Atlas
+*   Set up a free database cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+*   Retrieve your database connection URI (e.g., `mongodb+srv://<username>:<password>@cluster.mongodb.net/`).
+*   Update `MONGODB_URL` in your backend `.env` variables with this connection string.
+
+#### 2. Backend API: Render / Railway / AWS ECS
+*   Deploy the `backend` directory as a Python web service.
+*   Set environment variables (`GEMINI_API_KEY`, `GROQ_API_KEY`, `MONGODB_URL`, `JWT_SECRET`).
+*   **Startup Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+*   *Note: Make sure to commit your pre-built `backend/vectorstore/` directory or run `python app/rag/ingest.py` as a post-build command so that the FAISS index is loaded into the cloud container.*
+
+#### 3. Frontend Portal: Vercel
+*   Deploy the `frontend` directory to [Vercel](https://vercel.com).
+*   Set environment variables:
+    *   `NEXT_PUBLIC_API_URL` to your live backend API URL (e.g., `https://your-backend-api.onrender.com`).
+
