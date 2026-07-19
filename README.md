@@ -97,25 +97,33 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=120
 
 ### Prerequisites
 *   Ensure **MongoDB** is running locally (`mongodb://localhost:27017`).
-
-### 1. Ingest Knowledge Base
-Before starting the backend, index the company policy files located in the `knowledge_base/` folder:
+### 1. venv Initialization
 ```bash
 cd backend
+python -m venv venv
+venv\Scripts\activate
+```
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Ingest Knowledge Base
+Before starting the backend, index the company policy files located in the `knowledge_base/` folder:
+```bash
 python app/rag/ingest.py
 ```
 This parses the markdown/PDF manuals, creates vector embeddings, and saves the index inside the `vectorstore/` folder.
 
-### 2. Start the Backend API
+### 4. Start the Backend API
 Install dependencies and launch the Uvicorn server:
 ```bash
 # In backend directory
-pip install -r requirements.txt
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 The API documentation will be available at `http://127.0.0.1:8000/docs`.
 
-### 3. Start the Next.js Frontend
+### 5. Start the Next.js Frontend
 Navigate to the `frontend/` folder, install packages, and boot the server:
 ```bash
 cd frontend
